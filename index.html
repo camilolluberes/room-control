@@ -220,6 +220,26 @@ h1{margin:0;font-size:38px}
   margin-top:15px;
 }
 
+
+/* HYBRID SPOTIFY PLAYER */
+.musicShell{position:relative;overflow:hidden;margin-top:16px;border-radius:26px}
+.musicGlow{position:absolute;inset:-45px;background-position:center;background-size:cover;filter:blur(55px);opacity:.16;transform:scale(1.18);pointer-events:none}
+.musicInner{position:relative;z-index:1}
+.results:not(:empty){max-height:255px;overflow:auto;background:#fff;border:1px solid #ececef;border-radius:18px;padding:6px}
+.playerCard{margin-top:18px;text-align:center;background:rgba(245,245,247,.92);border-radius:26px;padding:24px 22px 20px}
+.playerCover{display:block;width:min(330px,72vw);aspect-ratio:1/1;object-fit:cover;margin:0 auto 20px;border-radius:22px;background:#e6e6e8;box-shadow:0 16px 45px rgba(0,0,0,.14)}
+.playerTitle{font-size:25px;line-height:1.15;font-weight:750;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.playerArtist{color:#777;font-size:15px;margin-top:6px}
+.progressRow{display:grid;grid-template-columns:42px 1fr 42px;align-items:center;gap:8px;margin-top:20px;color:#777;font-size:12px}
+.progressRow input,.volumeRow input{width:100%}
+.playerControls{display:flex;justify-content:center;align-items:center;gap:28px;margin-top:18px}
+.playerControls button{border:0;background:transparent;font-size:28px;min-width:52px;height:52px;cursor:pointer}
+.playerControls .mainPlay{width:66px;height:66px;border-radius:50%;background:#111;color:#fff;font-size:25px}
+.volumeRow{display:grid;grid-template-columns:26px 1fr 26px;align-items:center;gap:8px;margin-top:16px}
+.deviceLine{color:#777;font-size:13px;margin-top:15px}
+.activate{margin-top:14px;border:0;border-radius:14px;padding:12px 16px;background:#fff;font-weight:650;cursor:pointer}
+@media(max-width:800px){.popup{padding:20px}.playerCard{padding:18px 14px}.playerCover{width:min(300px,70vw)}}
+
 .generic{
   margin-top:25px;
   color:#777;
@@ -302,6 +322,7 @@ h1{margin:0;font-size:38px}
 </div>
 </div>
 
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
 <script>
 
 /* ================================
@@ -315,7 +336,7 @@ const REDIRECT_URI =
 "https://camilolluberes.github.io/room-control/";
 
 const SCOPES =
-"user-read-playback-state user-modify-playback-state user-read-currently-playing";
+"streaming user-read-playback-state user-modify-playback-state user-read-currently-playing";
 
 
 /* ================================
@@ -392,108 +413,54 @@ function openPanel(type){
 ================================ */
 
 function showMusic(){
-
   panelTitle.textContent="🎵 Music";
-
   const token=sessionStorage.getItem("spotify_token");
-
   if(!token){
-
     panelContent.innerHTML=`
-      <button class="connect" onclick="spotifyLogin()">
-        Connect Spotify
-      </button>
-
-      <div class="message">
-        Connect your Spotify account to search and control music.
-      </div>
-    `;
-
+      <button class="connect" onclick="spotifyLogin()">Connect Spotify</button>
+      <div class="message">Connect Spotify once, then this dashboard can become its own Spotify player.</div>`;
     return;
   }
-
   panelContent.innerHTML=`
-
-    <div class="spotifyConnected">
-      ● Spotify connected
-    </div>
-
-    <div class="searchBox">
-      <input
-        id="spotifySearch"
-        placeholder="Search songs..."
-        onkeydown="if(event.key==='Enter') searchSpotify()"
-      >
-
-      <button onclick="searchSpotify()">
-        Search
-      </button>
-    </div>
-
-    <div id="results" class="results"></div>
-
-    <div class="nowPlaying">
-
-      <div class="nowTop">
-
-        <img
-          id="nowCover"
-          src=""
-          alt=""
-          style="display:none"
-        >
-
-        <div>
-          <div class="label">NOW PLAYING</div>
-          <div id="nowTitle">Nothing playing</div>
-          <div id="nowArtist">Spotify</div>
+    <div class="spotifyConnected">● Spotify connected</div>
+    <div class="musicShell">
+      <div class="musicGlow" id="musicGlow"></div>
+      <div class="musicInner">
+        <div class="searchBox">
+          <input id="spotifySearch" placeholder="Search songs..." onkeydown="if(event.key==='Enter') searchSpotify()">
+          <button onclick="searchSpotify()">Search</button>
         </div>
-
+        <div id="results" class="results"></div>
+        <div class="playerCard">
+          <img id="nowCover" class="playerCover" src="" alt="" style="display:none">
+          <div class="label">NOW PLAYING</div>
+          <div id="nowTitle" class="playerTitle">Nothing playing</div>
+          <div id="nowArtist" class="playerArtist">Spotify</div>
+          <div class="progressRow">
+            <span id="elapsedTime">0:00</span>
+            <input id="progressBar" type="range" min="0" max="1000" value="0" oninput="previewSeek(this.value)" onchange="seekTrack(this.value)">
+            <span id="totalTime">0:00</span>
+          </div>
+          <div class="playerControls">
+            <button onclick="previousTrack()">⏮</button>
+            <button id="playButton" class="mainPlay" onclick="togglePlayback()">▶</button>
+            <button onclick="nextTrack()">⏭</button>
+          </div>
+          <div class="volumeRow">
+            <span>🔉</span>
+            <input id="volumeSlider" type="range" min="0" max="100" value="50" oninput="setVolume(this.value)">
+            <span>🔊</span>
+          </div>
+          <div id="deviceLine" class="deviceLine">Player: connecting Room Control…</div>
+          <button class="activate" onclick="activateRoomPlayer()">▶ Activate Room Control</button>
+        </div>
+        <button class="connect" onclick="openHomePod()">🔊 Spotify → HomePod</button>
+        <div id="spotifyMessage" class="message"></div>
       </div>
-
-      <div class="controls">
-
-        <button onclick="previousTrack()">⏮</button>
-
-        <button
-          id="playButton"
-          onclick="togglePlayback()"
-        >
-          ▶
-        </button>
-
-        <button onclick="nextTrack()">⏭</button>
-
-      </div>
-
-      <div class="volume">
-
-        <input
-          type="range"
-          min="0"
-          max="100"
-          value="50"
-          onchange="setVolume(this.value)"
-        >
-
-      </div>
-
-    </div>
-
-    <button
-      class="connect"
-      onclick="openHomePod()"
-    >
-      🔊 Spotify → HomePod
-    </button>
-
-    <div id="spotifyMessage" class="message"></div>
-
-  `;
-
+    </div>`;
+  ensureSpotifyPlayer();
   updateNowPlaying();
 }
-
 
 /* ================================
    PKCE HELPERS
@@ -633,14 +600,7 @@ async function handleSpotifyReturn(){
       "spotify_token",
       data.access_token
     );
-
-     fetch("http://192.168.0.44:5000/token", {
-      method: "POST",
-     headers: {"Content-Type": "application/json"},
-     body: JSON.stringify({token: data.access_token})
-     });
-
-    history.replaceState(
+history.replaceState(
       {},
       "",
       REDIRECT_URI
@@ -665,17 +625,7 @@ async function spotifyAPI(
   options={}
 ){
 
-  let token = sessionStorage.getItem("spotify_token");
-
-  if (!token) {
-  const response = await fetch("http://192.168.0.44:5000/token");
-  const data = await response.json();
-  token = data.token;
-
-  if (token) {
-    sessionStorage.setItem("spotify_token", token);
-  }
-}
+  const token = sessionStorage.getItem("spotify_token");
 
   if(!token){
     showMusic();
@@ -810,8 +760,11 @@ async function searchSpotify(){
     `;
 
 
-    button.onclick=()=>{
-      playTrack(track.uri);
+    button.onclick=async()=>{
+      await activateRoomPlayer();
+      await playTrack(track.uri);
+      results.innerHTML="";
+      input.value="";
     };
 
 
@@ -826,182 +779,154 @@ async function searchSpotify(){
 ================================ */
 
 async function playTrack(uri){
-
-  await spotifyAPI(
-    "/me/player/play",
-    {
-      method:"PUT",
-
-      headers:{
-        "Content-Type":
-        "application/json"
-      },
-
-      body:JSON.stringify({
-        uris:[uri]
-      })
-    }
-  );
-
-  setTimeout(
-    updateNowPlaying,
-    600
-  );
+  if(!spotifyDeviceId) await ensureSpotifyPlayer();
+  const target=spotifyDeviceId ? "?device_id="+encodeURIComponent(spotifyDeviceId) : "";
+  await spotifyAPI("/me/player/play"+target,{
+    method:"PUT",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({uris:[uri]})
+  });
+  setTimeout(updateNowPlaying,600);
 }
-
 
 /* ================================
    PLAY / PAUSE
 ================================ */
 
 async function togglePlayback(){
-
-  const state=
-    await spotifyAPI(
-      "/me/player"
-    );
-
-  if(!state) return;
-
-
-  if(state.is_playing){
-
-    await spotifyAPI(
-      "/me/player/pause",
-      {method:"PUT"}
-    );
-
-  }else{
-
-    await spotifyAPI(
-      "/me/player/play",
-      {method:"PUT"}
-    );
-
+  if(spotifyPlayer && spotifyDeviceId){
+    await spotifyPlayer.activateElement().catch(()=>{});
+    await spotifyPlayer.togglePlay();
+    setTimeout(updateNowPlaying,250);
+    return;
   }
-
-  setTimeout(
-    updateNowPlaying,
-    300
-  );
+  const state=await spotifyAPI("/me/player");
+  if(!state) return;
+  if(state.is_playing) await spotifyAPI("/me/player/pause",{method:"PUT"});
+  else await spotifyAPI("/me/player/play",{method:"PUT"});
+  setTimeout(updateNowPlaying,300);
 }
-
 
 /* ================================
    NEXT / PREVIOUS
 ================================ */
 
 async function nextTrack(){
-
-  await spotifyAPI(
-    "/me/player/next",
-    {method:"POST"}
-  );
-
-  setTimeout(
-    updateNowPlaying,
-    500
-  );
+  if(spotifyPlayer && spotifyDeviceId) await spotifyPlayer.nextTrack();
+  else await spotifyAPI("/me/player/next",{method:"POST"});
+  setTimeout(updateNowPlaying,400);
 }
-
-
 async function previousTrack(){
-
-  await spotifyAPI(
-    "/me/player/previous",
-    {method:"POST"}
-  );
-
-  setTimeout(
-    updateNowPlaying,
-    500
-  );
+  if(spotifyPlayer && spotifyDeviceId) await spotifyPlayer.previousTrack();
+  else await spotifyAPI("/me/player/previous",{method:"POST"});
+  setTimeout(updateNowPlaying,400);
 }
-
 
 /* ================================
    VOLUME
 ================================ */
 
 async function setVolume(value){
-
-  await spotifyAPI(
-    "/me/player/volume?volume_percent="
-    +value,
-    {
-      method:"PUT"
-    }
-  );
+  if(spotifyPlayer && spotifyDeviceId){
+    try{ await spotifyPlayer.setVolume(Number(value)/100); return; }catch(e){}
+  }
+  await spotifyAPI("/me/player/volume?volume_percent="+value+(spotifyDeviceId ? "&device_id="+encodeURIComponent(spotifyDeviceId) : ""),{method:"PUT"});
 }
-
 
 /* ================================
    NOW PLAYING
 ================================ */
 
+function formatTime(ms){
+  if(!Number.isFinite(ms)||ms<0) return "0:00";
+  const seconds=Math.floor(ms/1000);
+  return Math.floor(seconds/60)+":"+String(seconds%60).padStart(2,"0");
+}
+function paintPlayer(item,isPlaying,position=0,duration=0){
+  const title=document.getElementById("nowTitle"); if(!title) return;
+  if(!item){title.textContent="Nothing playing";document.getElementById("nowArtist").textContent="Spotify";return;}
+  title.textContent=item.name||"Unknown track";
+  document.getElementById("nowArtist").textContent=(item.artists||[]).map(a=>a.name).join(", ")||"Spotify";
+  const images=(item.album&&item.album.images)||[];
+  const image=images.length?images[0].url:"";
+  const cover=document.getElementById("nowCover");
+  if(image&&cover){cover.src=image;cover.style.display="block";const glow=document.getElementById("musicGlow");if(glow)glow.style.backgroundImage=`url("${image}")`;}
+  const play=document.getElementById("playButton");if(play)play.textContent=isPlaying?"❚❚":"▶";
+  const bar=document.getElementById("progressBar");
+  if(bar&&duration){bar.value=Math.max(0,Math.min(1000,(position/duration)*1000));bar.dataset.duration=duration;}
+  const elapsed=document.getElementById("elapsedTime"),total=document.getElementById("totalTime");
+  if(elapsed)elapsed.textContent=formatTime(position);if(total)total.textContent=formatTime(duration);
+}
 async function updateNowPlaying(){
-
-  const title=
-    document.getElementById(
-      "nowTitle"
-    );
-
-  if(!title) return;
-
-
-  const state=
-    await spotifyAPI(
-      "/me/player"
-    );
-
-
-  if(!state || !state.item){
-
-    title.textContent=
-      "Nothing playing";
-
-    return;
+  if(!document.getElementById("nowTitle"))return;
+  if(spotifyPlayer&&spotifyDeviceId){
+    const local=await spotifyPlayer.getCurrentState().catch(()=>null);
+    if(local&&local.track_window&&local.track_window.current_track){
+      paintPlayer(local.track_window.current_track,!local.paused,local.position,local.duration);return;
+    }
   }
-
-
-  title.textContent=
-    state.item.name;
-
-
-  document.getElementById(
-    "nowArtist"
-  ).textContent=
-    state.item.artists
-    .map(a=>a.name)
-    .join(", ");
-
-
-  const cover=
-    document.getElementById(
-      "nowCover"
-    );
-
-
-  if(
-    state.item.album &&
-    state.item.album.images.length
-  ){
-
-    cover.src=
-      state.item.album.images[0].url;
-
-    cover.style.display="block";
-  }
-
-
-  document.getElementById(
-    "playButton"
-  ).textContent=
-    state.is_playing
-    ? "❚❚"
-    : "▶";
+  const state=await spotifyAPI("/me/player");
+  if(!state||!state.item){paintPlayer(null,false,0,0);return;}
+  paintPlayer(state.item,state.is_playing,state.progress_ms||0,state.item.duration_ms||0);
+}
+function previewSeek(value){
+  const bar=document.getElementById("progressBar"),elapsed=document.getElementById("elapsedTime");
+  if(!bar||!elapsed)return;const duration=Number(bar.dataset.duration||0);elapsed.textContent=formatTime(duration*(Number(value)/1000));
+}
+async function seekTrack(value){
+  const bar=document.getElementById("progressBar");if(!bar)return;
+  const duration=Number(bar.dataset.duration||0),position=Math.round(duration*(Number(value)/1000));
+  if(spotifyPlayer&&spotifyDeviceId)await spotifyPlayer.seek(position);
+  else await spotifyAPI("/me/player/seek?position_ms="+position,{method:"PUT"});
 }
 
+/* WEB PLAYBACK SDK */
+let spotifyPlayer=null,spotifyDeviceId=null,spotifyPlayerPromise=null;
+function waitForSpotifySDK(){
+  if(window.Spotify)return Promise.resolve();
+  return new Promise(resolve=>{window.onSpotifyWebPlaybackSDKReady=()=>resolve();});
+}
+async function ensureSpotifyPlayer(){
+  const token=sessionStorage.getItem("spotify_token");if(!token)return false;
+  if(spotifyPlayer&&spotifyDeviceId)return true;if(spotifyPlayerPromise)return spotifyPlayerPromise;
+  spotifyPlayerPromise=(async()=>{
+    await waitForSpotifySDK();
+    spotifyPlayer=new Spotify.Player({
+      name:"Room Control",
+      getOAuthToken:cb=>cb(sessionStorage.getItem("spotify_token")||""),
+      volume:0.5,
+      enableMediaSession:true
+    });
+    spotifyPlayer.addListener("ready",({device_id})=>{
+      spotifyDeviceId=device_id;
+      const line=document.getElementById("deviceLine");if(line)line.textContent="Playing on: Room Control";
+      const slider=document.getElementById("volumeSlider");
+      if(slider)spotifyPlayer.getVolume().then(v=>slider.value=Math.round(v*100)).catch(()=>{});
+    });
+    spotifyPlayer.addListener("not_ready",({device_id})=>{if(device_id===spotifyDeviceId)spotifyDeviceId=null;});
+    spotifyPlayer.addListener("player_state_changed",state=>{if(state)paintPlayer(state.track_window.current_track,!state.paused,state.position,state.duration);});
+    const showErr=({message})=>{const el=document.getElementById("spotifyMessage");if(el)el.textContent=message;console.error(message);};
+    spotifyPlayer.addListener("initialization_error",showErr);
+    spotifyPlayer.addListener("authentication_error",showErr);
+    spotifyPlayer.addListener("account_error",showErr);
+    spotifyPlayer.addListener("playback_error",showErr);
+    spotifyPlayer.addListener("autoplay_failed",()=>{const el=document.getElementById("spotifyMessage");if(el)el.textContent="Tap Activate Room Control once to allow audio on this iPad.";});
+    return await spotifyPlayer.connect();
+  })();
+  const result=await spotifyPlayerPromise;spotifyPlayerPromise=null;return result;
+}
+async function activateRoomPlayer(){
+  await ensureSpotifyPlayer();if(!spotifyPlayer)return;
+  await spotifyPlayer.activateElement().catch(()=>{});
+  if(spotifyDeviceId){
+    await spotifyAPI("/me/player",{
+      method:"PUT",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({device_ids:[spotifyDeviceId],play:false})
+    });
+    const line=document.getElementById("deviceLine");if(line)line.textContent="Playing on: Room Control";
+  }
+}
 
 /* ================================
    HOMEPOD SHORTCUT
